@@ -27,76 +27,53 @@ def reader(file):
   
 def writer(file, time, volts, marker):
   print("Writing file " + file)
-  with open(file, 'a') as output:
+  with open(file, 'w') as output:
     for t, v, m in zip(time, volts, marker):
       output.write(str(t) + ' ' + str(v) + ' ' + str(m) + '\n')
       
-def sit(input, output, A):
+def s50hz(time, volts, A):
   noise = []
-  A = random.uniform(0.8, 1.9)
-  
-  time, volts, marker = reader(input)
+  if "random" in str(A): A = random.uniform(0.8, 1.9)
   
   for t in time:
     y = A*sin(2*pi*49.9*t) + A*sin(2*pi*50*t) + A*sin(2*pi*50.1*t) + A*sin(2*pi*99.9*t) + A*sin(2*pi*100*t) + A*sin(2*pi*100.1*t)   # pro 49,9 - 50,1 Hz
     noise.append(y)
-  volts_sit = array(noise) + array(volts)
-  
-  #fig, ax = plt.subplots()
-  #ax.plot(time[0:len(time)], volts2[0:len(time)])
-  #plt.show()
-  
-  writer(output, time, volts_sit, marker)
+  #volts_sit = array(noise) + array(volts)
+  return noise, [A]
 
-def lin_d(input, output, k):
-  k = random.uniform(1.0, 2.5)
+def lin_d(time, volts, k):
+  if "random" in str(k): k = random.uniform(1.0, 2.5)
+  return k*array(time), [k]
 
-  time, volts, marker = reader(input)
-
-  volts_ldrift = k*array(time) + array(volts)
-
-  writer(output, time, volts_ldrift, marker)
-
-def sin_d(input, output, A):
-  time, volts, marker = reader(input)
-  A = random.uniform(0.8, 1.9)
-
-  T = random.uniform(2.1, 3.8) # perioda [s]
+def sin_d(time, volts, A, T):
+  if "random" in str(A): A = random.uniform(0.8, 1.9)
+  if "random" in str(T): T = random.uniform(10.0, 25.0) # perioda [s]
 
   drift_sin = A*sin(2*pi*1.0/T*array(time))
   volts_sdrift = drift_sin + array(volts)
-  writer(output, time, volts_sdrift, marker)
+  return A*sin(2*pi*1.0/T*array(time)), [A, T]
 
-def abrupt(input, output, A):
-  time, volts, marker = reader(input)
+def abrupt(time, volts, A, k):
+  if "random" in str(A): A = random.uniform(0.8, 1.9)
+  if "random" in str(k): k = random.uniform(1.0, 2.5)  #[0.7, 1.0, 1.5, 2.0, 2.5]  # rychlost klesani
+
+  return exp(-k*array(time)), [A, k]
+
+def sqr_sig(time, volts, A, tl):
+  if "random" in str(A): A = random.uniform(0.8, 1.9)
+  if "random" in str(tl): tl = random.uniform(10.0, 25.0)  #tloustka pulzu
+
+  return  A*signal.square(2*pi*tl*array(time)), [A, tl]
+
+def myopotence(time, volts, k, fd, fh):
+  if "random" in str(k): k = random.uniform(1.0, 2.5)
+  if "random" in str(fd): fd = random.uniform(12.5, 29.9)
+  if "random" in str(fh): fh = random.uniform(92.1, 108.9)
   
-  A = random.uniform(0.8, 1.9)
-  k = random.uniform(0.7, 2.5)  #[0.7, 1.0, 1.5, 2.0, 2.5]  # rychlost klesani
-
-  abr = exp(-k*array(time))
-  volts_exp = volts + abr
-
-  writer(output, time, volts_exp, marker)
-
-def sqr_sig(input, output, A):
-  time, volts, marker = reader(input)
-
-  A = random.uniform(0.8, 1.9)
-  tl = random.uniform(3.5, 6.0)  #tloustka pulzu
-
-  y_obd = A*signal.square(2*pi*tl*array(time))
-  volts_obd = y_obd + volts
-
-  writer(output, time, volts_obd, marker)
-
-def myopotence(input, output):#???
-  time, volts, marker = reader(input)
-
   freq = arange(20,100,0.1)  # Hz
-  k = 2.5   #volitelné
-  fd = 20.0    # volitelné
-  fh = 100.0  #volitelné 
-  y_myop = (k*fh**4*freq**2)/((freq**2+fd**2)*(freq**2+fh**2)**2) # ???
+  y_myop = (k*fh**4*freq**2)/((freq**2+fd**2)*(freq**2+fh**2)**2)
+
+  return y_myop, [k, fd, fh]
 
 def main():
   if len(sys.argv) <= 1:
@@ -114,60 +91,67 @@ def main():
           
           Priklad: noise=1""".format(sys.argv[0]))
     return
-    
+  
   output = ""
-  amplitude = 1
+  amplitude = 1.0
+  k = 2.5
+  T = 3.0
+  tl = 3.5
+  fd = 20.0
+  fh = 100.0
     
   for parameter in sys.argv:
-    if "in=" in parameter:
-      print(parameter.split("=")[1])
-      input = parameter.split("=")[1]
-    if "out=" in parameter:
-      output = parameter.split("=")[1]
-    if "noise=" in parameter:
-      noise = int(parameter.split("=")[1])
+    if "in=" in parameter: input = parameter.split("=")[1]
+    if "out=" in parameter: output = parameter.split("=")[1]
+    if "noise=" in parameter: noises = [int(i)-1 for i in parameter.split("=")[1].split(',')]
     if "amp=" in parameter:
-      amplitude = int(parameter.split("=")[1])
-        
-  if noise == 1:
-    if os.path.isfile(input):
-      sit(input, output, amplitude)
-    else:
-      os.makedirs(output, exist_ok=True)
-      for file in os.listdir(input):
-        sit(input + "/" + file, output + "/" + str(noise) + "_" + file, amplitude)
-    
-  if noise == 2:
-    if os.path.isfile(input):
-      lin_d(input, output, amplitude)
-    else:
-      os.makedirs(output, exist_ok=True)
-      for file in os.listdir(input):
-        lin_d(input + "/" + file, output + "/" + str(noise) + "_" + file, amplitude)
-          
-  if noise == 3:
-    if os.path.isfile(input):
-      sin_d(input, output, amplitude)
-    else:
-      os.makedirs(output, exist_ok=True)
-      for file in os.listdir(input):
-        sin_d(input + "/" + file, output + "/" + str(noise) + "_" + file, amplitude)
+        if 'random' not in parameter: amplitude = float(parameter.split("=")[1])
+        else: amplitude = parameter.split("=")[1]
+    if "k=" in parameter:
+        if 'random' not in parameter: k = float(parameter.split("=")[1])
+        else: k = parameter.split("=")[1]
+    if "T=" in parameter:
+        if 'random' not in parameter: T = float(parameter.split("=")[1])
+        else: T = parameter.split("=")[1]
+    if "tl=" in parameter:
+        if 'random' not in parameter: tl = float(parameter.split("=")[1])
+        else: tl = parameter.split("=")[1]
+    if "fd=" in parameter:
+        if 'random' not in parameter: fd = float(parameter.split("=")[1])
+        else: fd = parameter.split("=")[1]
+    if "fh=" in parameter:
+        if 'random' not in parameter: fh = float(parameter.split("=")[1])
+        else: fh = parameter.split("=")[1]
 
-  if noise == 4:
-    if os.path.isfile(input):
-      abrupt(input, output, amplitude)
-    else:
-      os.makedirs(output, exist_ok=True)
-      for file in os.listdir(input):
-        abrupt(input + "/" + file, output + "/" + str(noise) + "_" + file, amplitude)
-          
-  if noise == 5:
-    if os.path.isfile(input):
-      sqr_sig(input, output, amplitude)
-    else:
-      os.makedirs(output, exist_ok=True)
-      for file in os.listdir(input):
-        sqr_sig(input + "/" + file, output + "/" + str(noise) + "_" + file, amplitude)
+  noiseDB = {'s50hz': [['volts'], amplitude], 'lin_d': [['volts'], k], 'sin_d': [['volts'], amplitude, T], 'abrupt': [['volts'], amplitude, k], 'sqr_sig': [['volts'], amplitude, tl], 'myopotence': [['volts'], k, fd, fh], 'GLOBAL': [['time'], ['volts'], ['marker']]}
+
+  if os.path.isfile(input):
+    list(noiseDB.values())[-1][0], list(noiseDB.values())[-1][1], list(noiseDB.values())[-1][2] = reader(input) # time, volts, marker = reader(input)
+    volts2 = []
+    output_fname = ""
+    for noise in noises:
+      apply_noise = globals()[list(noiseDB.keys())[noise]] # read function name dynamically from DB
+      list(noiseDB.values())[noise][0], list(noiseDB.values())[noise][1:] = apply_noise(*(list(noiseDB.values())[-1][:2] + list(noiseDB.values())[noise][1:]))  # volts, optional_params = apply_noise()
+      if not len(volts2) > 0: volts2 = array(list(noiseDB.values())[-1][1])
+      volts2 = volts2 + array(list(noiseDB.values())[noise][0])
+      output_fname += list(noiseDB.keys())[noise] + "=" + str(list(noiseDB.values())[noise][1:]) + "_"
+    output_fname += os.path.basename(input) + "_" + output
+    writer(output_fname, list(noiseDB.values())[-1][0], volts2, list(noiseDB.values())[-1][2])
+  else:
+    os.makedirs(output, exist_ok=True)
+    for file in os.listdir(input):
+      list(noiseDB.values())[-1][0], list(noiseDB.values())[-1][1], list(noiseDB.values())[-1][2] = reader(os.path.join(input, file)) # time, volts, marker = reader(input)
+      volts2 = []
+      output_fname = output + "/"
+      for noise in noises:
+        apply_noise = globals()[list(noiseDB.keys())[noise]] # read function name dynamically from DB
+        list(noiseDB.values())[noise][0], list(noiseDB.values())[noise][1:] = apply_noise(*(list(noiseDB.values())[-1][:2] + list(noiseDB.values())[noise][1:]))  # volts, optional_params = apply_noise()
+        if not len(volts2) > 0: volts2 = array(list(noiseDB.values())[-1][1])
+        volts2 = volts2 + array(list(noiseDB.values())[noise][0])
+        output_fname += list(noiseDB.keys())[noise] + "=" + str(list(noiseDB.values())[noise][1:]) + "_"
+      output_fname += file
+      writer(output_fname, list(noiseDB.values())[-1][0], volts2, list(noiseDB.values())[-1][2])
+
 
 if __name__ == '__main__':
   main()
