@@ -42,8 +42,9 @@ def s50hz(time, volts, A):
   return noise, [A]
 
 def lin_d(time, volts, k):
-  if "random" in str(k): k = random.uniform(1.0, 2.5)
-  return k*array(time), [k]
+  if "random" in str(k): k = random.uniform(12.0, 22.0)
+   #return k*array(time), [k]
+   return signal.sawtooth((np.pi/(k/2))*array(time), 0.5)
 
 def sin_d(time, volts, A, T):
   if "random" in str(A): A = random.uniform(0.8, 1.9)
